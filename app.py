@@ -1,4 +1,5 @@
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, request, jsonify
+import os
 import requests
 import firebase_admin
 from firebase_admin import credentials, db
@@ -8,9 +9,6 @@ from collections import defaultdict
 
 app = Flask(__name__)
 
-# Discogs API token
-DISCOGS_TOKEN = 'HaugEnfScUsKKaiktXamoqIsMJSXXiRBVTWhnUUG'
-
 # Firebase setup
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
@@ -19,38 +17,54 @@ firebase_admin.initialize_app(cred, {
 
 # Google Sheets setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-credentials_gsheet = ServiceAccountCredentials.from_json_keyfile_name("serviceAccountKey.json", scope)
-gs_client = gspread.authorize(credentials_gsheet)
+gs_creds = ServiceAccountCredentials.from_json_keyfile_name("serviceAccountKey.json", scope)
+gs_client = gspread.authorize(gs_creds)
 sheet = gs_client.open("VinylInventory").sheet1
+
+DISCOGS_TOKEN = os.getenv("DISCOGS_TOKEN")
 
 HTML_PAGE = """
 <!doctype html>
 <html>
 <head>
   <title>Vinyl Scanner</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js'></script>
 </head>
-<body class="bg-dark text-white">
-  <div class="container py-5">
-    <h2 class="text-center mb-4">🎵 Hule Vinyl Scanner</h2>
-    <div class="mb-4 text-center">
-      <a href="/inventory" class="btn btn-outline-light">View Inventory</a>
+<body class='bg-dark text-white'>
+  <div class='container py-5'>
+    <h2 class='text-center mb-4'>🎵 Hule Vinyl Scanner</h2>
+    <div class='mb-4 text-center'>
+      <a href='/inventory' class='btn btn-outline-light'>View Inventory</a>
     </div>
-    <div id="scanner" class="border rounded p-3 mb-3" style="width:100%; max-width:400px; margin:auto;"></div>
-    <p id="status" class="text-center">Scanning...</p>
-    <div id="album-info" class="text-center"></div>
+    <div id='scanner' class='border rounded p-3 mb-3' style='width:100%; max-width:400px; margin:auto;'></div>
+    <p id='status' class='text-center'>Scanning...</p>
+    <div id='album-info' class='text-center'></div>
+
+    <div class='text-center mt-3'>
+      <p>Having trouble? Enter barcode manually:</p>
+      <input id='manual-barcode' class='form-control w-50 mx-auto' placeholder='Enter barcode'>
+      <button class='btn btn-primary mt-2' onclick='lookupManual()'>Look up</button>
+      <small class='text-muted d-block mt-2'>Tip: Hold the vinyl 6–12 inches away in good lighting. Tap to focus if supported.</small>
+    </div>
   </div>
+
   <script>
     Quagga.init({
       inputStream: {
         name: "Live",
         type: "LiveStream",
-        target: document.querySelector('#scanner')
+        target: document.querySelector('#scanner'),
+        constraints: {
+          facingMode: { exact: "environment" },
+          width: { min: 1280 },
+          height: { min: 720 }
+        }
       },
       decoder: {
         readers: ["ean_reader"]
-      }
+      },
+      locate: true
     }, function(err) {
       if (err) {
         document.getElementById('status').textContent = 'Error initializing scanner';
@@ -63,30 +77,42 @@ HTML_PAGE = """
       Quagga.stop();
       let code = data.codeResult.code;
       document.getElementById('status').textContent = 'Barcode: ' + code;
-
       fetch('/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ barcode: code })
       })
       .then(res => res.json())
-      .then(data => {
-        if (data.error) {
-          document.getElementById('album-info').innerHTML = '<p>' + data.error + '</p>';
-        } else {
-          let content = `<h3>${data.title}</h3><p>Artist: ${data.artist} <br> Year: ${data.year}</p>`;
-          if (data.exists) {
-            content += `<p>Price: $${data.price}</p>
-                        <button class="btn btn-danger" onclick="sellAlbum('${data.barcode}')">Mark as Sold</button>`;
-          } else {
-            content += `<img src="${data.thumb}" class="img-thumbnail my-2" width="150" /><br>
-                        <input type="number" class="form-control w-50 mx-auto" id="price" placeholder="Price" />
-                        <button class="btn btn-success mt-2" onclick="saveAlbum('${code}', '${data.title}', '${data.artist}', '${data.year}')">Save to Inventory</button>`;
-          }
-          document.getElementById('album-info').innerHTML = content;
-        }
-      });
+      .then(renderAlbumInfo);
     });
+
+    function lookupManual() {
+      const code = document.getElementById("manual-barcode").value;
+      fetch('/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode: code })
+      })
+      .then(res => res.json())
+      .then(renderAlbumInfo);
+    }
+
+    function renderAlbumInfo(data) {
+      if (data.error) {
+        document.getElementById('album-info').innerHTML = '<p>' + data.error + '</p>';
+      } else {
+        let content = `<h3>${data.title}</h3><p>Artist: ${data.artist} <br> Year: ${data.year}</p>`;
+        if (data.exists) {
+          content += `<p>Price: $${data.price}</p>
+                      <button class="btn btn-danger" onclick="sellAlbum('${data.barcode}')">Mark as Sold</button>`;
+        } else {
+          content += `<img src="${data.thumb}" class="img-thumbnail my-2" width="150" /><br>
+                      <input type="number" class="form-control w-50 mx-auto" id="price" placeholder="Price" />
+                      <button class="btn btn-success mt-2" onclick="saveAlbum('${data.barcode}', '${data.title}', '${data.artist}', '${data.year}')">Save to Inventory</button>`;
+        }
+        document.getElementById('album-info').innerHTML = content;
+      }
+    }
 
     function saveAlbum(barcode, title, artist, year) {
       const price = document.getElementById('price').value;
@@ -116,8 +142,8 @@ HTML_PAGE = """
 """
 
 @app.route('/')
-def index():
-    return render_template_string(HTML_PAGE)
+def home():
+    return HTML_PAGE
 
 @app.route('/inventory')
 def inventory():
