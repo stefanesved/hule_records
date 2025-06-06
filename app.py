@@ -21,7 +21,8 @@ gs_creds = ServiceAccountCredentials.from_json_keyfile_name("serviceAccountKey.j
 gs_client = gspread.authorize(gs_creds)
 sheet = gs_client.open("VinylInventory").sheet1
 
-DISCOGS_TOKEN = os.getenv("DISCOGS_TOKEN")
+DISCOGS_TOKEN = "HaugEnfScUsKKaiktXamoqIsMJSXXiRBVTWhnUUG"
+
 
 HTML_PAGE = """
 <!doctype html>
