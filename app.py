@@ -30,6 +30,20 @@ HTML_PAGE = """
   <title>Vinyl Scanner</title>
   <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
   <script src='https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js'></script>
+  <style>
+    #scanner video {
+      width: 100% !important;
+      height: auto !important;
+      border-radius: 12px;
+      object-fit: cover;
+      max-height: 220px;
+    }
+    #scanner {
+      height: 220px;
+      position: relative;
+      overflow: hidden;
+    }
+</style>
 </head>
 <body class='bg-dark text-white'>
   <div class='container py-5'>
@@ -37,8 +51,8 @@ HTML_PAGE = """
     <div class='mb-4 text-center'>
       <a href='/inventory' class='btn btn-outline-light'>View Inventory</a>
     </div>
-    <div id='scanner' class='border rounded p-3 mb-3' style='width:100%; max-width:400px; margin:auto;'></div>
-    <p id='status' class='text-center'>Scanning...</p>
+    <div id='scanner' class='border rounded p-3 mb-3'></div>
+    <p id='status' class='text-center'>Initializing camera...</p>
     <div id='album-info' class='text-center'></div>
 
     <div class='text-center mt-3'>
@@ -50,41 +64,50 @@ HTML_PAGE = """
   </div>
 
   <script>
-    Quagga.init({
-      inputStream: {
-        name: "Live",
-        type: "LiveStream",
-        target: document.querySelector('#scanner'),
-        constraints: {
-          facingMode: { exact: "environment" },
-          width: { min: 1280 },
-          height: { min: 720 }
+    function initQuagga() {
+      Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: document.querySelector('#scanner'),
+          constraints: {
+            facingMode: { ideal: "environment" },
+            aspectRatio: { ideal: 1.33 },
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+            width: { min: 1280 },
+            height: { min: 720 }
+          }
+        },
+        decoder: {
+          readers: ["ean_reader"]
+        },
+        locate: true
+      }, function(err) {
+        if (err) {
+          console.error('Quagga init error:', err);
+          document.getElementById('status').textContent = 'Camera access failed. Check browser permissions.';
+          return;
         }
-      },
-      decoder: {
-        readers: ["ean_reader"]
-      },
-      locate: true
-    }, function(err) {
-      if (err) {
-        document.getElementById('status').textContent = 'Error initializing scanner';
-        return;
-      }
-      Quagga.start();
-    });
+        Quagga.start();
+        document.getElementById('status').textContent = 'Scanning...';
+      });
 
-    Quagga.onDetected(function(data) {
-      Quagga.stop();
-      let code = data.codeResult.code;
-      document.getElementById('status').textContent = 'Barcode: ' + code;
-      fetch('/lookup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ barcode: code })
-      })
-      .then(res => res.json())
-      .then(renderAlbumInfo);
-    });
+      Quagga.onDetected(function(data) {
+        Quagga.stop();
+        Quagga.CameraAccess.release();
+        let code = data.codeResult.code;
+        document.getElementById('status').textContent = 'Barcode: ' + code;
+        fetch('/lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ barcode: code })
+        })
+        .then(res => res.json())
+        .then(renderAlbumInfo);
+      });
+    }
 
     function lookupManual() {
       const code = document.getElementById("manual-barcode").value;
@@ -136,6 +159,8 @@ HTML_PAGE = """
         location.reload();
       });
     }
+
+    window.addEventListener('DOMContentLoaded', initQuagga);
   </script>
 </body>
 </html>
