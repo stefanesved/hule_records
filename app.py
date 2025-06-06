@@ -65,19 +65,19 @@ HTML_PAGE = """
 
   <script>
     function initQuagga() {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const facingMode = isMobile ? { ideal: "environment" } : { ideal: "user" };
+
       Quagga.init({
         inputStream: {
           name: "Live",
           type: "LiveStream",
           target: document.querySelector('#scanner'),
           constraints: {
-            facingMode: { ideal: "environment" },
+            facingMode: facingMode,
             aspectRatio: { ideal: 1.33 },
             width: { ideal: 640 },
             height: { ideal: 480 }
-          },
-            width: { min: 1280 },
-            height: { min: 720 }
           }
         },
         decoder: {
@@ -166,6 +166,7 @@ HTML_PAGE = """
 </html>
 """
 
+# Flask endpoints below (unchanged)
 @app.route('/')
 def home():
     return HTML_PAGE
