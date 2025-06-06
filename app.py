@@ -137,31 +137,6 @@ HTML_PAGE = """
         }
         document.getElementById('album-info').innerHTML = content;
       }
-    }</h3><p>Artist: ${data.artist} <br> Year: ${data.year}</p>`;
-        if (data.thumb) {
-          content += `<img src="${data.thumb}" class="img-thumbnail my-2" width="150" /><br>`;
-        }
-        if (data.exists) {
-          content += `<p>Price: $${data.price}</p>
-                      <button class="btn btn-danger" onclick="sellAlbum('${data.barcode}')">Mark as Sold</button>`;
-        } else {
-          content += `<input type="number" class="form-control w-50 mx-auto" id="price" placeholder="Price" />
-                      <button class="btn btn-success mt-2" onclick="saveAlbum('${data.barcode}', '${data.title}', '${data.artist}', '${data.year}')">Save to Inventory</button>`;
-        }
-        document.getElementById('album-info').innerHTML = content;
-      }
-    } else {
-        let content = `<h3>${data.title}</h3><p>Artist: ${data.artist} <br> Year: ${data.year}</p>`;
-        if (data.exists) {
-          content += `<p>Price: $${data.price}</p>
-                      <button class="btn btn-danger" onclick="sellAlbum('${data.barcode}')">Mark as Sold</button>`;
-        } else {
-          content += `<img src="${data.thumb}" class="img-thumbnail my-2" width="150" /><br>
-                      <input type="number" class="form-control w-50 mx-auto" id="price" placeholder="Price" />
-                      <button class="btn btn-success mt-2" onclick="saveAlbum('${data.barcode}', '${data.title}', '${data.artist}', '${data.year}')">Save to Inventory</button>`;
-        }
-        document.getElementById('album-info').innerHTML = content;
-      }
     }
 
     function saveAlbum(barcode, title, artist, year) {
