@@ -142,10 +142,11 @@ HTML_PAGE = """
 
     function saveAlbum(barcode, title, artist, year) {
       const price = document.getElementById('price').value;
+      const thumb = document.querySelector('#album-info img')?.src || null;
       fetch('/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ barcode, title, artist, year, price })
+        body: JSON.stringify({ barcode, title, artist, year, price, thumb })
       }).then(res => res.json()).then(data => {
         alert(data.message);
         location.reload();
@@ -223,8 +224,22 @@ def lookup():
     inventory_ref = db.reference('inventory')
     item = inventory_ref.child(barcode).get()
     if item:
+        # Fetch thumb from Discogs even if item exists
+        discogs_thumb = None
+        try:
+            r = requests.get("https://api.discogs.com/database/search", params={
+                'barcode': barcode,
+                'token': DISCOGS_TOKEN
+            })
+            results = r.json().get('results')
+            if results:
+                discogs_thumb = results[0].get('thumb')
+        except:
+            pass
+
         item['barcode'] = barcode
         item['exists'] = True
+        item['thumb'] = discogs_thumb
         return jsonify(item)
 
     r = requests.get("https://api.discogs.com/database/search", params={
@@ -236,8 +251,9 @@ def lookup():
         item = results[0]
         return jsonify({
             'exists': False,
-            'title': item.get('title'),
-            'artist': item.get('title').split(' - ')[0],
+            'barcode': barcode,
+        'title': item.get('title'),
+        'artist': item.get('title').split(' - ')[0],
             'year': item.get('year', 'Unknown'),
             'thumb': item.get('thumb')
         })
@@ -252,7 +268,8 @@ def save():
         'title': data['title'],
         'artist': data['artist'],
         'year': data['year'],
-        'price': float(data['price'])
+        'price': float(data['price']),
+        'thumb': data.get('thumb')
     })
 
     try:
