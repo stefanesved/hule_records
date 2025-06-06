@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Item Details</title>
+</head>
+<body>
+    {% if item %}
+    <h1>Record #{{ item[0] }}</h1>
+    <img src="/{{ item[6] }}" width="200"><br>
+    <strong>Title:</strong> {{ item[1] }}<br>
+    <strong>Artist:</strong> {{ item[2] }}<br>
+    <strong>Price:</strong> ${{ item[3] }}<br>
+    <strong>Quantity:</strong> {{ item[4] }}<br>
+    <strong>Status:</strong> {% if item[7] == 1 %}Sold{% else %}Available{% endif %}<br>
+    <strong>Added:</strong> {{ item[8] }}<br>
+    <img src="/{{ item[5] }}" width="150"><br>
+    {% else %}
+    <p>Item not found.</p>
+    {% endif %}
+    <a href="/">Back to Inventory</a>
+</body>
+</html>
